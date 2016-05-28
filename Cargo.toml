@@ -1,0 +1,16 @@
+[package]
+name = "seqlock"
+version = "0.1.0"
+authors = ["Amanieu d'Antras <amanieu@gmail.com>"]
+description = "A reader-writer lock that provides extremely fast read access without starving writers."
+documentation = "https://amanieu.github.io/seqlock/seqlock/index.html"
+license = "Apache-2.0/MIT"
+repository = "https://github.com/Amanieu/seqlock"
+readme = "README.md"
+keywords = ["seqlock", "rwlock", "thread"]
+
+[dependencies]
+parking_lot = "0.2"
+
+[features]
+nightly = ["parking_lot/nightly"]
