@@ -21,6 +21,24 @@ You should instead use `RwLock` from the
 [parking_lot](https://github.com/Amanieu/parking_lot) crate if you need
 a reader-writer lock for types that are not `Copy`.
 
+## Implementation
+
+The implementation is based on the [Linux `seqlock` type](http://lxr.free-electrons.com/source/include/linux/seqlock.h).
+Each `SeqLock` contains a sequence counter which tracks modifications to the
+locked data. The basic idea is that a reader will perform the following
+operations:
+
+1. Read the sequence counter.
+2. Read the data in the lock.
+3. Read the sequence counter again.
+4. If the two sequence counter values differ, loop back and try again.
+5. Otherwise return the data that was read in step 2.
+
+Similarly, a writer will increment the sequence counter before and after
+writing to the data in the lock. Once a reader sees that the sequence
+counter has not changed while it was reading the data, it can safely return
+that data to the caller since it is known to be in a consistent state.
+
 ## Example
 
 ```
