@@ -88,7 +88,7 @@ unsafe impl<T: Copy + Send> Sync for SeqLock<T> {}
 pub struct SeqLockGuard<'a, T: Copy + 'a> {
     _guard: MutexGuard<'a, ()>,
     seqlock: &'a SeqLock<T>,
-    data: &'a mut T,
+    seq: usize,
 }
 
 impl<T: Copy> SeqLock<T> {
@@ -161,34 +161,35 @@ impl<T: Copy> SeqLock<T> {
     }
 
     #[inline]
-    fn begin_write(&self) {
+    fn begin_write(&self) -> usize {
         // Increment the sequence number. At this point, the number will be odd,
         // which will force readers to spin until we finish writing.
-        let seq = self.seq.load(Ordering::Relaxed);
-        self.seq.store(seq.wrapping_add(1), Ordering::Relaxed);
+        let seq = self.seq.load(Ordering::Relaxed).wrapping_add(1);
+        self.seq.store(seq, Ordering::Relaxed);
 
         // Make sure any writes to the data happen after incrementing the
         // sequence number. What we ideally want is a store(Acquire), but the
         // Acquire ordering is not available on stores.
         fence(Ordering::Release);
+
+        seq
     }
 
     #[inline]
-    fn end_write(&self) {
+    fn end_write(&self, seq: usize) {
         // Increment the sequence number again, which will make it even and
         // allow readers to access the data. The release ordering ensures that
         // all writes to the data are done before writing the sequence number.
-        let seq = self.seq.load(Ordering::Relaxed);
         self.seq.store(seq.wrapping_add(1), Ordering::Release);
     }
 
     #[inline]
-    fn lock_guard<'a>(&'a self, guard: MutexGuard<'a, ()>) -> SeqLockGuard<'a, T> {
-        self.begin_write();
+    fn lock_guard<'a>(&'a self, guard: MutexGuard<'a, ()>,) -> SeqLockGuard<'a, T> {
+        let seq = self.begin_write();
         SeqLockGuard {
             _guard: guard,
             seqlock: self,
-            data: unsafe { &mut *self.data.get() },
+            seq: seq,
         }
     }
 
@@ -250,20 +251,20 @@ impl<'a, T: Copy + 'a> Deref for SeqLockGuard<'a, T> {
     type Target = T;
     #[inline]
     fn deref(&self) -> &T {
-        self.data
+        unsafe { &*self.seqlock.data.get() }
     }
 }
 
 impl<'a, T: Copy + 'a> DerefMut for SeqLockGuard<'a, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut T {
-        self.data
+        unsafe { &mut *self.seqlock.data.get() }
     }
 }
 
 impl<'a, T: Copy + 'a> Drop for SeqLockGuard<'a, T> {
     #[inline]
     fn drop(&mut self) {
-        self.seqlock.end_write();
+        self.seqlock.end_write(self.seq);
     }
 }
