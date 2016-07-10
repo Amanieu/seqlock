@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["SeqLock","A sequential lock"],["SeqLockGuard","RAII structure used to release the exclusive write access of a `SeqLock` when dropped."]]});

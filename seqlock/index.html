@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `seqlock` crate.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, seqlock">
+
+    <title>seqlock - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'></p><script>window.sidebarCurrent = {name: 'seqlock', ty: 'mod', relpath: '../'};</script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content mod">
+<h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>seqlock</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a id='src-0' class='srclink' href='../src/seqlock/src/lib.rs.html#8-270' title='goto source code'>[src]</a></span></h1>
+<div class='docblock'><p>This library provides the <code>SeqLock</code> type, which is a form of reader-writer
+lock that is heavily optimized for readers.</p>
+
+<p>In certain situations, <code>SeqLock</code> can be two orders of magnitude faster than
+the standard library <code>RwLock</code> type. Another advantage is that readers cannot
+starve writers: a writer will never block even if there are readers
+currently accessing the <code>SeqLock</code>.</p>
+
+<p>The only downside of <code>SeqLock</code> is that it only works on types that are
+<code>Copy</code>. This means that it is unsuitable for types that contains pointers
+to owned data.</p>
+
+<p>You should instead use <code>RwLock</code> from the
+<a href="https://github.com/Amanieu/parking_lot">parking_lot</a> crate if you need
+a reader-writer lock for types that are not <code>Copy</code>.</p>
+
+<h1 id='implementation' class='section-header'><a href='#implementation'>Implementation</a></h1>
+<p>The implementation is based on the <a href="http://lxr.free-electrons.com/source/include/linux/seqlock.h">Linux seqlock type</a>.
+Each <code>SeqLock</code> contains a sequence counter which tracks modifications to the
+locked data. The basic idea is that a reader will perform the following
+operations:</p>
+
+<ol>
+<li>Read the sequence counter.</li>
+<li>Read the data in the lock.</li>
+<li>Read the sequence counter again.</li>
+<li>If the two sequence counter values differ, loop back and try again.</li>
+<li>Otherwise return the data that was read in step 2.</li>
+</ol>
+
+<p>Similarly, a writer will increment the sequence counter before and after
+writing to the data in the lock. Once a reader sees that the sequence
+counter has not changed while it was reading the data, it can safely return
+that data to the caller since it is known to be in a consistent state.</p>
+
+<h1 id='examples' class='section-header'><a href='#examples'>Examples</a></h1>
+<pre class='rust rust-example-rendered'>
+<span class='kw'>use</span> <span class='ident'>seqlock</span>::<span class='ident'>SeqLock</span>;
+
+<span class='kw'>let</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>SeqLock</span>::<span class='ident'>new</span>(<span class='number'>5</span>);
+
+{
+    <span class='comment'>// Writing to the data involves a lock</span>
+    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>w</span> <span class='op'>=</span> <span class='ident'>lock</span>.<span class='ident'>lock_write</span>();
+    <span class='op'>*</span><span class='ident'>w</span> <span class='op'>+=</span> <span class='number'>1</span>;
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>w</span>, <span class='number'>6</span>);
+}
+
+{
+    <span class='comment'>// Reading the data is a very fast operation</span>
+    <span class='kw'>let</span> <span class='ident'>r</span> <span class='op'>=</span> <span class='ident'>lock</span>.<span class='ident'>read</span>();
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>r</span>, <span class='number'>6</span>);
+}</pre>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class='struct' href='struct.SeqLock.html'
+                                  title='seqlock::SeqLock'>SeqLock</a></td>
+                           <td class='docblock short'>
+                                <p>A sequential lock</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class='struct' href='struct.SeqLockGuard.html'
+                                  title='seqlock::SeqLockGuard'>SeqLockGuard</a></td>
+                           <td class='docblock short'>
+                                <p>RAII structure used to release the exclusive write access of a <code>SeqLock</code>
+when dropped.</p>
+                           </td>
+                       </tr></table></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "seqlock";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `SeqLock` struct in crate `seqlock`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, SeqLock">
+
+    <title>seqlock::SeqLock - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>seqlock</a></p><script>window.sidebarCurrent = {name: 'SeqLock', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>seqlock</a>::<wbr><a class='struct' href=''>SeqLock</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a id='src-12' class='srclink' href='../src/seqlock/src/lib.rs.html#77-81' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct SeqLock&lt;T:&nbsp;<a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Copy.html' title='core::marker::Copy'>Copy</a>&gt; {
+    // some fields omitted
+}</pre><div class='docblock'><p>A sequential lock</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><span class='in-band'><code>impl&lt;T:&nbsp;<a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Copy.html' title='core::marker::Copy'>Copy</a>&gt; <a class='struct' href='../seqlock/struct.SeqLock.html' title='seqlock::SeqLock'>SeqLock</a>&lt;T&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a id='src-27' class='srclink' href='../src/seqlock/src/lib.rs.html#94-235' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.new' class='method'><code>const fn <a href='#method.new' class='fnname'>new</a>(val: T) -&gt; <a class='struct' href='../seqlock/struct.SeqLock.html' title='seqlock::SeqLock'>SeqLock</a>&lt;T&gt;</code></h4>
+<div class='docblock'><p>Creates a new SeqLock with the given initial value.</p>
+</div><h4 id='method.read' class='method'><code>fn <a href='#method.read' class='fnname'>read</a>(&amp;self) -&gt; T</code></h4>
+<div class='docblock'><p>Reads the value protected by the <code>SeqLock</code>.</p>
+
+<p>This operation is extremely fast since it only reads the <code>SeqLock</code>,
+which allows multiple readers to read the value without interfering with
+each other.</p>
+
+<p>If a writer is currently modifying the contained value then the calling
+thread will block until the writer thread releases the lock.</p>
+
+<p>Attempting to read from a <code>SeqLock</code> while already holding a write lock
+in the current thread will result in a deadlock.</p>
+</div><h4 id='method.lock_write' class='method'><code>fn <a href='#method.lock_write' class='fnname'>lock_write</a>(&amp;self) -&gt; <a class='struct' href='../seqlock/struct.SeqLockGuard.html' title='seqlock::SeqLockGuard'>SeqLockGuard</a>&lt;T&gt;</code></h4>
+<div class='docblock'><p>Locks this <code>SeqLock</code> with exclusive write access, blocking the current
+thread until it can be acquired.</p>
+
+<p>This function does not block while waiting for concurrent readers.
+Instead, readers will detect the concurrent write and retry the read.</p>
+
+<p>Returns an RAII guard which will drop the write access of this <code>SeqLock</code>
+when dropped.</p>
+</div><h4 id='method.try_lock_write' class='method'><code>fn <a href='#method.try_lock_write' class='fnname'>try_lock_write</a>(&amp;self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='struct' href='../seqlock/struct.SeqLockGuard.html' title='seqlock::SeqLockGuard'>SeqLockGuard</a>&lt;T&gt;&gt;</code></h4>
+<div class='docblock'><p>Attempts to lock this <code>SeqLock</code> with exclusive write access.</p>
+
+<p>If the lock could not be acquired at this time, then <code>None</code> is returned.
+Otherwise, an RAII guard is returned which will release the lock when
+it is dropped.</p>
+
+<p>This function does not block.</p>
+</div><h4 id='method.into_inner' class='method'><code>fn <a href='#method.into_inner' class='fnname'>into_inner</a>(self) -&gt; T</code></h4>
+<div class='docblock'><p>Consumes this <code>SeqLock</code>, returning the underlying data.</p>
+</div><h4 id='method.get_mut' class='method'><code>fn <a href='#method.get_mut' class='fnname'>get_mut</a>(&amp;mut self) -&gt; &amp;mut T</code></h4>
+<div class='docblock'><p>Returns a mutable reference to the underlying data.</p>
+
+<p>Since this call borrows the <code>SeqLock</code> mutably, no actual locking needs
+to take place---the mutable borrow statically guarantees no locks exist.</p>
+</div></div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><span class='in-band'><code>impl&lt;T:&nbsp;<a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Copy.html' title='core::marker::Copy'>Copy</a> + <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a>&gt; <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> for <a class='struct' href='../seqlock/struct.SeqLock.html' title='seqlock::SeqLock'>SeqLock</a>&lt;T&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a id='src-17' class='srclink' href='../src/seqlock/src/lib.rs.html#83' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'></div><h3 class='impl'><span class='in-band'><code>impl&lt;T:&nbsp;<a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Copy.html' title='core::marker::Copy'>Copy</a> + <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a>&gt; <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Sync.html' title='core::marker::Sync'>Sync</a> for <a class='struct' href='../seqlock/struct.SeqLock.html' title='seqlock::SeqLock'>SeqLock</a>&lt;T&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a id='src-19' class='srclink' href='../src/seqlock/src/lib.rs.html#84' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'></div><h3 class='impl'><span class='in-band'><code>impl&lt;T:&nbsp;<a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Copy.html' title='core::marker::Copy'>Copy</a> + <a class='trait' href='https://doc.rust-lang.org/nightly/core/default/trait.Default.html' title='core::default::Default'>Default</a>&gt; <a class='trait' href='https://doc.rust-lang.org/nightly/core/default/trait.Default.html' title='core::default::Default'>Default</a> for <a class='struct' href='../seqlock/struct.SeqLock.html' title='seqlock::SeqLock'>SeqLock</a>&lt;T&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a id='src-57' class='srclink' href='../src/seqlock/src/lib.rs.html#237-242' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.default' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/default/trait.Default.html#tymethod.default' class='fnname'>default</a>() -&gt; <a class='struct' href='../seqlock/struct.SeqLock.html' title='seqlock::SeqLock'>SeqLock</a>&lt;T&gt;</code></h4>
+<div class='docblock'><p>Returns the &quot;default value&quot; for a type. <a href="https://doc.rust-lang.org/nightly/core/default/trait.Default.html#tymethod.default">Read more</a></p>
+</div></div><h3 class='impl'><span class='in-band'><code>impl&lt;T:&nbsp;<a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Copy.html' title='core::marker::Copy'>Copy</a> + <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a>&gt; <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='struct' href='../seqlock/struct.SeqLock.html' title='seqlock::SeqLock'>SeqLock</a>&lt;T&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a id='src-60' class='srclink' href='../src/seqlock/src/lib.rs.html#244-248' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.fmt' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#tymethod.fmt' class='fnname'>fmt</a>(&amp;self, f: &amp;mut <a class='struct' href='https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html' title='core::fmt::Formatter'>Formatter</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/core/fmt/type.Result.html' title='core::fmt::Result'>Result</a></code></h4>
+<div class='docblock'><p>Formats the value using the given formatter.</p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "seqlock";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script defer src="../search-index.js"></script>
+</body>
+</html>
