@@ -23,7 +23,7 @@
 //!
 //! # Implementation
 //!
-//! The implementation is based on the [Linux seqlock type](http://lxr.free-electrons.com/source/include/linux/seqlock.h).
+//! The implementation is based on the [Hans Boehm's paper](http://www.hpl.hp.com/techreports/2012/HPL-2012-68.pdf).
 //! Each `SeqLock` contains a sequence counter which tracks modifications to the
 //! locked data. The basic idea is that a reader will perform the following
 //! operations:
@@ -63,21 +63,17 @@
 #![warn(missing_docs)]
 #![cfg_attr(feature = "nightly", feature(const_fn))]
 
-extern crate parking_lot;
-
 use std::sync::atomic::{AtomicUsize, Ordering, fence};
 use std::cell::UnsafeCell;
 use std::ptr;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::thread;
-use parking_lot::{Mutex, MutexGuard};
 
 /// A sequential lock
 pub struct SeqLock<T: Copy> {
     seq: AtomicUsize,
     data: UnsafeCell<T>,
-    mutex: Mutex<()>,
 }
 
 unsafe impl<T: Copy + Send> Send for SeqLock<T> {}
@@ -86,7 +82,6 @@ unsafe impl<T: Copy + Send> Sync for SeqLock<T> {}
 /// RAII structure used to release the exclusive write access of a `SeqLock`
 /// when dropped.
 pub struct SeqLockGuard<'a, T: Copy + 'a> {
-    _guard: MutexGuard<'a, ()>,
     seqlock: &'a SeqLock<T>,
     seq: usize,
 }
@@ -99,7 +94,6 @@ impl<T: Copy> SeqLock<T> {
         SeqLock {
             seq: AtomicUsize::new(0),
             data: UnsafeCell::new(val),
-            mutex: Mutex::new(()),
         }
     }
 
@@ -110,7 +104,6 @@ impl<T: Copy> SeqLock<T> {
         SeqLock {
             seq: AtomicUsize::new(0),
             data: UnsafeCell::new(val),
-            mutex: Mutex::new(()),
         }
     }
 
@@ -161,18 +154,27 @@ impl<T: Copy> SeqLock<T> {
     }
 
     #[inline]
-    fn begin_write(&self) -> usize {
-        // Increment the sequence number. At this point, the number will be odd,
-        // which will force readers to spin until we finish writing.
-        let seq = self.seq.load(Ordering::Relaxed).wrapping_add(1);
-        self.seq.store(seq, Ordering::Relaxed);
+    fn try_begin_write(&self) -> Option<usize> {
+        let seq = self.seq.load(Ordering::Relaxed);
+
+        if seq & 1 != 0 {
+            // It is already locked.
+            return None;
+        }
+
+        // Increment the sequence number, after which the number will be odd, forcing readers to
+        // spin until we finish writing.
+        if self.seq.compare_exchange_weak(seq, seq + 1, Ordering::Acquire, Ordering::Relaxed).is_err() {
+            // If we couldn't lock it.
+            return None;
+        }
 
         // Make sure any writes to the data happen after incrementing the
         // sequence number. What we ideally want is a store(Acquire), but the
         // Acquire ordering is not available on stores.
         fence(Ordering::Release);
 
-        seq
+        Some(seq + 1)
     }
 
     #[inline]
@@ -181,16 +183,6 @@ impl<T: Copy> SeqLock<T> {
         // allow readers to access the data. The release ordering ensures that
         // all writes to the data are done before writing the sequence number.
         self.seq.store(seq.wrapping_add(1), Ordering::Release);
-    }
-
-    #[inline]
-    fn lock_guard<'a>(&'a self, guard: MutexGuard<'a, ()>,) -> SeqLockGuard<'a, T> {
-        let seq = self.begin_write();
-        SeqLockGuard {
-            _guard: guard,
-            seqlock: self,
-            seq: seq,
-        }
     }
 
     /// Locks this `SeqLock` with exclusive write access, blocking the current
@@ -203,7 +195,14 @@ impl<T: Copy> SeqLock<T> {
     /// when dropped.
     #[inline]
     pub fn lock_write(&self) -> SeqLockGuard<T> {
-        self.lock_guard(self.mutex.lock())
+        loop {
+            if let Some(seq) = self.try_begin_write() {
+                return SeqLockGuard {
+                    seqlock: self,
+                    seq: seq,
+                }
+            }
+        }
     }
 
     /// Attempts to lock this `SeqLock` with exclusive write access.
@@ -215,7 +214,13 @@ impl<T: Copy> SeqLock<T> {
     /// This function does not block.
     #[inline]
     pub fn try_lock_write(&self) -> Option<SeqLockGuard<T>> {
-        self.mutex.try_lock().map(|g| self.lock_guard(g))
+        self.try_begin_write()
+            .map(|seq| {
+                SeqLockGuard {
+                    seqlock: self,
+                    seq: seq,
+                }
+            })
     }
 
     /// Consumes this `SeqLock`, returning the underlying data.
