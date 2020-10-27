@@ -10,7 +10,7 @@ readme = "README.md"
 keywords = ["seqlock", "rwlock", "thread"]
 
 [dependencies]
-parking_lot = "0.2"
+parking_lot = "0.11"
 
 [features]
 nightly = ["parking_lot/nightly"]
