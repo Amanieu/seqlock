@@ -1,9 +1,9 @@
 SeqLock
 =======
 
-[![Build Status](https://travis-ci.org/Amanieu/seqlock.svg?branch=master)](https://travis-ci.org/Amanieu/seqlock) [![Crates.io](https://img.shields.io/crates/v/seqlock.svg)](https://crates.io/crates/seqlock)
+[![Crates.io](https://img.shields.io/crates/v/seqlock.svg)](https://crates.io/crates/seqlock)
 
-[Documentation](https://amanieu.github.io/seqlock/seqlock/index.html)
+[Documentation](https://docs.rs/seqlock/latest/seqlock/)
 
 This library provides the `SeqLock` type, which is a form of reader-writer
 lock that is heavily optimized for readers.
@@ -17,8 +17,7 @@ The only downside of `SeqLock` is that it only works on types that are
 `Copy`. This means that it is unsuitable for types that contains pointers
 to owned data.
 
-You should instead use `RwLock` from the
-[parking_lot](https://github.com/Amanieu/parking_lot) crate if you need
+You should instead use a `RwLock` if you need
 a reader-writer lock for types that are not `Copy`.
 
 ## Implementation
@@ -41,7 +40,7 @@ that data to the caller since it is known to be in a consistent state.
 
 ## Example
 
-```
+```rust
 use seqlock::SeqLock;
 
 let lock = SeqLock::new(5);
@@ -58,29 +57,6 @@ let lock = SeqLock::new(5);
     let r = lock.read();
     assert_eq!(r, 6);
 }
-```
-
-## Usage
-
-Add this to your `Cargo.toml`:
-
-```toml
-[dependencies]
-seqlock = "0.1"
-```
-
-and this to your crate root:
-
-```rust
-extern crate seqlock;
-```
-
-To enable nightly-only features (currently just `const fn` constructors), add
-this to your `Cargo.toml` instead:
-
-```toml
-[dependencies]
-seqlock = {version = "0.1", features = ["nightly"]}
 ```
 
 ## License

@@ -1,6 +1,7 @@
 [package]
 name = "seqlock"
 version = "0.1.2"
+edition = "2021"
 authors = ["Amanieu d'Antras <amanieu@gmail.com>"]
 description = "A reader-writer lock that provides extremely fast read access without starving writers."
 documentation = "https://amanieu.github.io/seqlock/seqlock/index.html"
@@ -10,7 +11,5 @@ readme = "README.md"
 keywords = ["seqlock", "rwlock", "thread"]
 
 [dependencies]
-parking_lot = "0.11"
+parking_lot = "0.12"
 
-[features]
-nightly = ["parking_lot/nightly"]

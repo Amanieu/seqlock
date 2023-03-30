@@ -1,10 +1,3 @@
-// Copyright 2016 Amanieu d'Antras
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
-
 //! This library provides the `SeqLock` type, which is a form of reader-writer
 //! lock that is heavily optimized for readers.
 //!
@@ -17,8 +10,7 @@
 //! `Copy`. This means that it is unsuitable for types that contains pointers
 //! to owned data.
 //!
-//! You should instead use `RwLock` from the
-//! [parking_lot](https://github.com/Amanieu/parking_lot) crate if you need
+//! You should instead use a `RwLock` if you need
 //! a reader-writer lock for types that are not `Copy`.
 //!
 //! # Implementation
@@ -60,53 +52,49 @@
 //! }
 //! ```
 
-#![warn(missing_docs)]
-#![cfg_attr(feature = "nightly", feature(const_fn))]
+#![warn(missing_docs, rust_2018_idioms)]
 
-extern crate parking_lot;
-
-use std::sync::atomic::{AtomicUsize, Ordering, fence};
-use std::cell::UnsafeCell;
-use std::ptr;
-use std::fmt;
-use std::ops::{Deref, DerefMut};
-use std::thread;
 use parking_lot::{Mutex, MutexGuard};
+use std::cell::UnsafeCell;
+use std::fmt;
+use std::mem::MaybeUninit;
+use std::ops::{Deref, DerefMut};
+use std::ptr;
+use std::sync::atomic::{fence, AtomicUsize, Ordering};
+use std::thread;
 
 /// A sequential lock
-pub struct SeqLock<T: Copy> {
+pub struct SeqLock<T> {
     seq: AtomicUsize,
     data: UnsafeCell<T>,
     mutex: Mutex<()>,
 }
 
-unsafe impl<T: Copy + Send> Send for SeqLock<T> {}
-unsafe impl<T: Copy + Send> Sync for SeqLock<T> {}
+unsafe impl<T: Send> Send for SeqLock<T> {}
+unsafe impl<T: Send> Sync for SeqLock<T> {}
 
 /// RAII structure used to release the exclusive write access of a `SeqLock`
 /// when dropped.
-pub struct SeqLockGuard<'a, T: Copy + 'a> {
+pub struct SeqLockGuard<'a, T> {
     _guard: MutexGuard<'a, ()>,
     seqlock: &'a SeqLock<T>,
     seq: usize,
 }
 
+impl<T> SeqLock<T> {
+    #[inline]
+    fn end_write(&self, seq: usize) {
+        // Increment the sequence number again, which will make it even and
+        // allow readers to access the data. The release ordering ensures that
+        // all writes to the data are done before writing the sequence number.
+        self.seq.store(seq.wrapping_add(1), Ordering::Release);
+    }
+}
+
 impl<T: Copy> SeqLock<T> {
     /// Creates a new SeqLock with the given initial value.
-    #[cfg(feature = "nightly")]
     #[inline]
     pub const fn new(val: T) -> SeqLock<T> {
-        SeqLock {
-            seq: AtomicUsize::new(0),
-            data: UnsafeCell::new(val),
-            mutex: Mutex::new(()),
-        }
-    }
-
-    /// Creates a new SeqLock with the given initial value.
-    #[cfg(not(feature = "nightly"))]
-    #[inline]
-    pub fn new(val: T) -> SeqLock<T> {
         SeqLock {
             seq: AtomicUsize::new(0),
             data: UnsafeCell::new(val),
@@ -143,8 +131,9 @@ impl<T: Copy> SeqLock<T> {
             }
 
             // We need to use a volatile read here because the data may be
-            // concurrently modified by a writer.
-            let result = unsafe { ptr::read_volatile(self.data.get()) };
+            // concurrently modified by a writer. We also use MaybeUninit in
+            // case we read the data in the middle of a modification.
+            let result = unsafe { ptr::read_volatile(self.data.get() as *mut MaybeUninit<T>) };
 
             // Make sure the seq2 read occurs after reading the data. What we
             // ideally want is a load(Release), but the Release ordering is not
@@ -155,7 +144,7 @@ impl<T: Copy> SeqLock<T> {
             // while we were reading it, and can be returned.
             let seq2 = self.seq.load(Ordering::Relaxed);
             if seq1 == seq2 {
-                return result;
+                return unsafe { result.assume_init() };
             }
         }
     }
@@ -176,15 +165,7 @@ impl<T: Copy> SeqLock<T> {
     }
 
     #[inline]
-    fn end_write(&self, seq: usize) {
-        // Increment the sequence number again, which will make it even and
-        // allow readers to access the data. The release ordering ensures that
-        // all writes to the data are done before writing the sequence number.
-        self.seq.store(seq.wrapping_add(1), Ordering::Release);
-    }
-
-    #[inline]
-    fn lock_guard<'a>(&'a self, guard: MutexGuard<'a, ()>,) -> SeqLockGuard<'a, T> {
+    fn lock_guard<'a>(&'a self, guard: MutexGuard<'a, ()>) -> SeqLockGuard<'a, T> {
         let seq = self.begin_write();
         SeqLockGuard {
             _guard: guard,
@@ -202,7 +183,7 @@ impl<T: Copy> SeqLock<T> {
     /// Returns an RAII guard which will drop the write access of this `SeqLock`
     /// when dropped.
     #[inline]
-    pub fn lock_write(&self) -> SeqLockGuard<T> {
+    pub fn lock_write(&self) -> SeqLockGuard<'_, T> {
         self.lock_guard(self.mutex.lock())
     }
 
@@ -214,7 +195,7 @@ impl<T: Copy> SeqLock<T> {
     ///
     /// This function does not block.
     #[inline]
-    pub fn try_lock_write(&self) -> Option<SeqLockGuard<T>> {
+    pub fn try_lock_write(&self) -> Option<SeqLockGuard<'_, T>> {
         self.mutex.try_lock().map(|g| self.lock_guard(g))
     }
 
@@ -242,7 +223,7 @@ impl<T: Copy + Default> Default for SeqLock<T> {
 }
 
 impl<T: Copy + fmt::Debug> fmt::Debug for SeqLock<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "SeqLock {{ data: {:?} }}", &self.read())
     }
 }
@@ -262,7 +243,7 @@ impl<'a, T: Copy + 'a> DerefMut for SeqLockGuard<'a, T> {
     }
 }
 
-impl<'a, T: Copy + 'a> Drop for SeqLockGuard<'a, T> {
+impl<T> Drop for SeqLockGuard<'_, T> {
     #[inline]
     fn drop(&mut self) {
         self.seqlock.end_write(self.seq);
