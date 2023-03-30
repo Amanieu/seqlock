@@ -1,10 +1,9 @@
 [package]
 name = "seqlock"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 authors = ["Amanieu d'Antras <amanieu@gmail.com>"]
 description = "A reader-writer lock that provides extremely fast read access without starving writers."
-documentation = "https://amanieu.github.io/seqlock/seqlock/index.html"
 license = "Apache-2.0/MIT"
 repository = "https://github.com/Amanieu/seqlock"
 readme = "README.md"
