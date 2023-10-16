@@ -153,15 +153,15 @@ impl<T: Copy> SeqLock<T> {
     fn begin_write(&self) -> usize {
         // Increment the sequence number. At this point, the number will be odd,
         // which will force readers to spin until we finish writing.
-        let seq = self.seq.load(Ordering::Relaxed).wrapping_add(1);
-        self.seq.store(seq, Ordering::Relaxed);
+        const INC: usize = 1;
+        let prev = self.seq.fetch_add(INC, Ordering::Relaxed);
 
         // Make sure any writes to the data happen after incrementing the
         // sequence number. What we ideally want is a store(Acquire), but the
         // Acquire ordering is not available on stores.
         fence(Ordering::Release);
 
-        seq
+        prev.wrapping_add(INC)
     }
 
     #[inline]
